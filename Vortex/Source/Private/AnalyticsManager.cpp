@@ -109,6 +109,7 @@ FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
     NewTracking.tracking.session_id = SessionId;
     NewTracking.tracking.platform = Platform;
     NewTracking.tracking.app_version = AppVersion;
+    NewTracking.tracking.custom = CustomData;
     NewTracking.tracking.timestamp = GetTimestamp();
     return NewTracking;
 }
@@ -237,8 +238,30 @@ void UAnalyticsManager::FlushInternalQueue()
 
 FString UAnalyticsManager::SerializeTracking(const FTracking& Tracking)
 {
+    TSharedPtr<FJsonObject> JsonObj = MakeShareable(new FJsonObject);
+    
+    // Create tracking data object
+    TSharedPtr<FJsonObject> TrackingDataObj = MakeShareable(new FJsonObject);
+    TrackingDataObj->SetStringField("name", Tracking.tracking.name);
+    TrackingDataObj->SetStringField("value", Tracking.tracking.value);
+    TrackingDataObj->SetStringField("identity", Tracking.tracking.identity);
+    TrackingDataObj->SetStringField("session_id", Tracking.tracking.session_id);
+    TrackingDataObj->SetStringField("platform", Tracking.tracking.platform);
+    TrackingDataObj->SetStringField("app_version", Tracking.tracking.app_version);
+    TrackingDataObj->SetStringField("timestamp", Tracking.tracking.timestamp);
+    
+    // Only add custom field if not empty
+    if (!Tracking.tracking.custom.IsEmpty())
+    {
+        TrackingDataObj->SetStringField("custom", Tracking.tracking.custom);
+    }
+    
+    JsonObj->SetStringField("tenant_id", Tracking.tenant_id);
+    JsonObj->SetObjectField("tracking", TrackingDataObj);
+    
     FString OutputString;
-    FJsonObjectConverter::UStructToJsonObjectString(Tracking, OutputString);
+    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+    FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
     return OutputString;
 }
 
@@ -257,6 +280,22 @@ FString UAnalyticsManager::SerializeMap(const TMap<FString, FString>& Map)
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
     FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
     return OutputString;
+}
+
+void UAnalyticsManager::SetCustomData(TMap<FString, FString> InCustomData)
+{
+    if (InCustomData.Num() == 0)
+    {
+        CustomData = TEXT("");
+        return;
+    }
+
+    CustomData = SerializeMap(InCustomData);
+}
+
+void UAnalyticsManager::ClearCustomData()
+{
+    CustomData = TEXT("");
 }
 
 FString UAnalyticsManager::GetTimestamp()

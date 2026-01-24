@@ -15,6 +15,7 @@ struct FTrackingData
     UPROPERTY() FString session_id;
     UPROPERTY() FString platform;
     UPROPERTY() FString app_version;
+    UPROPERTY() FString custom;
     UPROPERTY() FString timestamp;
 };
 
@@ -59,6 +60,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Vortex")
     void SetAutoBatching(bool bEnabled, float Interval = 10.0f);
 
+    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    void SetCustomData(TMap<FString, FString> CustomData);
+
+    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    void ClearCustomData();
+
 protected:
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
@@ -74,6 +81,7 @@ private:
     FString Identity;
     FString SessionId;
     FString AppVersion;
+    FString CustomData = TEXT("");
 
     bool bIsServerChecked = false;
     bool bServerAlive = false;

@@ -72,3 +72,44 @@ You can let the system handle the network calls in the background:
 // Flushes the internal queue every 20 seconds automatically
 Analytics->SetAutoBatching(true, 20.0f);
 ```
+
+## Custom Data
+
+### Overview
+Custom data allows you to attach persistent metadata to all subsequent events. This is useful for tracking user session information, device settings, or any other contextual data that applies to multiple events.
+
+### Setting Custom Data
+
+Use `SetCustomData()` to attach metadata that will be automatically included in every event:
+
+```cpp
+// C++:
+TMap<FString, FString> CustomData;
+CustomData.Add(TEXT("user_tier"), TEXT("premium"));
+CustomData.Add(TEXT("region"), TEXT("EU"));
+Analytics->SetCustomData(CustomData);
+```
+
+In Blueprint, use the **Set Custom Data** node and connect it to a **Make Map** node:
+
+```
+Make Map → [key: "user_tier", value: "premium"]
+          [key: "region", value: "EU"]
+            → Set Custom Data
+```
+
+### Clearing Custom Data
+
+To remove custom data from future events:
+
+```cpp
+// C++:
+Analytics->ClearCustomData();
+```
+
+### Behavior Details
+
+- **When empty**: The `custom` field is **completely omitted** from the JSON payload. This keeps the request size minimal.
+- **When set**: The custom data is automatically serialized to JSON and included in every event until cleared.
+- **Automatic inclusion**: Custom data is automatically sent with all tracking methods (single events, batched events, etc.).
+- **No validation needed**: The Map serialization handles the JSON conversion for you.
