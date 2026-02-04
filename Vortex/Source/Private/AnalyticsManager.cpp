@@ -27,6 +27,12 @@ void UAnalyticsManager::Initialize(FSubsystemCollectionBase& Collection)
 
 void UAnalyticsManager::Deinitialize()
 {
+    if (bInitialized && bServerAlive)
+    {
+        FTracking ExitTracking = CreateTracking(TEXT("app_exit"), TEXT(""));
+        ManualBatchedTracks.tracks.Add(ExitTracking);
+    }
+
     FScopeLock Lock(&QueueLock);
     if (InternalQueue.Num() > 0)
     {
