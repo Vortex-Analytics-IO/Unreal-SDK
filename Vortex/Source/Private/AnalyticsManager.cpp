@@ -1,6 +1,12 @@
 #include "AnalyticsManager.h"
 #include "VortexSettings.h"
 #include "Kismet/GameplayStatics.h"
+
+DEFINE_LOG_CATEGORY(LogVortex);
+
+#define VORTEX_LOG(Format, ...) \
+    if (const UVortexSettings* S = GetDefault<UVortexSettings>(); S && S->bVerbose) \
+        UE_LOG(LogVortex, Log, TEXT(Format), ##__VA_ARGS__)
 #include "JsonObjectConverter.h"
 #include "Misc/Guid.h"
 #include "Misc/ConfigCacheIni.h"
@@ -37,6 +43,7 @@ void UAnalyticsManager::Deinitialize()
 void UAnalyticsManager::Init(FString InTenantId, FString InUrl, FString InPlatform)
 {
     if (bInitialized) return;
+    VORTEX_LOG("Init called - TenantId: %s, Url: %s, Platform: %s", *InTenantId, *InUrl, *InPlatform);
     TenantId = InTenantId;
     Url = InUrl;
     Platform = InPlatform;
@@ -46,16 +53,27 @@ void UAnalyticsManager::Init(FString InTenantId, FString InUrl, FString InPlatfo
 void UAnalyticsManager::InternalInitialize()
 {
     const UVortexSettings* Settings = GetDefault<UVortexSettings>();
-    if (!Settings || !Settings->bEnabled) return;
+    if (!Settings || !Settings->bEnabled)
+    {
+        VORTEX_LOG("InternalInitialize skipped - Analytics disabled");
+        return;
+    }
 
-    // Check Editor
-    if (GIsEditor && !Settings->bEnableInEditor) return;
+    if (GIsEditor && !Settings->bEnableInEditor)
+    {
+        VORTEX_LOG("InternalInitialize skipped - Editor mode disabled");
+        return;
+    }
 
-    // Check Shipping
-    if (!Settings->bEnableInShipping) return;
+    if (!Settings->bEnableInShipping)
+    {
+        VORTEX_LOG("InternalInitialize skipped - Shipping disabled");
+        return;
+    }
 
     if (bInitialized) return;
     bInitialized = true;
+    VORTEX_LOG("Analytics initialized successfully");
     InitSession();
     CheckServerAvailability();
     TrackEvent(TEXT("app_started"));
@@ -97,6 +115,7 @@ void UAnalyticsManager::InitSession()
     );
     
     if(AppVersion.IsEmpty()) AppVersion = TEXT("1.0.0");
+    VORTEX_LOG("Session initialized - Identity: %s, SessionId: %s, AppVersion: %s", *Identity, *SessionId, *AppVersion);
 }
 
 FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
@@ -117,6 +136,7 @@ FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
 void UAnalyticsManager::CheckServerAvailability()
 {
     if (Url.IsEmpty()) return;
+    VORTEX_LOG("Checking server availability at %s/health", *Url);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("GET");
     Request->SetURL(Url + "/health");
@@ -128,6 +148,7 @@ void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResp
 {
     bServerAlive = bWasSuccessful && Response.IsValid() && EHttpResponseCodes::IsOk(Response->GetResponseCode());
     bIsServerChecked = true;
+    VORTEX_LOG("Server check completed - Alive: %s", bServerAlive ? TEXT("true") : TEXT("false"));
 
     if (bServerAlive)
     {
@@ -137,6 +158,20 @@ void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResp
             if (InternalQueue.Num() > 0 && GetWorld())
                 GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UAnalyticsManager::FlushInternalQueue);
         }
+    }
+}
+
+void UAnalyticsManager::OnRequestComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+{
+    if (!bWasSuccessful)
+    {
+        UE_LOG(LogVortex, Warning, TEXT("Request failed: %s"), *Request->GetURL());
+        return;
+    }
+    if (!Response.IsValid() || !EHttpResponseCodes::IsOk(Response->GetResponseCode()))
+    {
+        int32 Code = Response.IsValid() ? Response->GetResponseCode() : 0;
+        UE_LOG(LogVortex, Warning, TEXT("Request error %d: %s"), Code, *Request->GetURL());
     }
 }
 
@@ -173,6 +208,7 @@ void UAnalyticsManager::ProcessTrackEvent(FString EventName, FString Value)
     const UVortexSettings* Settings = GetDefault<UVortexSettings>();
     if (!Settings || !Settings->bEnabled) return;
 
+    VORTEX_LOG("Processing event: %s", *EventName);
     FTracking TrackingObj = CreateTracking(EventName, Value);
     FScopeLock Lock(&QueueLock);
     if (!bIsServerChecked || bAutoBatching) InternalQueue.Add(TrackingObj);
@@ -193,11 +229,13 @@ void UAnalyticsManager::FlushManualBatch()
 
 void UAnalyticsManager::PostSingle(const FTracking& Tracking)
 {
+    VORTEX_LOG("Posting single event: %s", *Tracking.tracking.name);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/track");
     Request->SetHeader("Content-Type", "application/json");
     Request->SetContentAsString(SerializeTracking(Tracking));
+    Request->OnProcessRequestComplete().BindUObject(this, &UAnalyticsManager::OnRequestComplete);
     Request->ProcessRequest();
 }
 
@@ -205,17 +243,21 @@ void UAnalyticsManager::PostBatchRoutine()
 {
     if (!bServerAlive) return;
     FString JsonPayload;
+    int32 BatchCount = 0;
     {
         FScopeLock Lock(&QueueLock);
         if (ManualBatchedTracks.tracks.Num() == 0) return;
+        BatchCount = ManualBatchedTracks.tracks.Num();
         JsonPayload = SerializeBatch(ManualBatchedTracks);
         ManualBatchedTracks.tracks.Empty();
     }
+    VORTEX_LOG("Posting manual batch with %d events", BatchCount);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/batch");
     Request->SetHeader("Content-Type", "application/json");
     Request->SetContentAsString(JsonPayload);
+    Request->OnProcessRequestComplete().BindUObject(this, &UAnalyticsManager::OnRequestComplete);
     Request->ProcessRequest();
 }
 
@@ -228,11 +270,13 @@ void UAnalyticsManager::FlushInternalQueue()
         BatchToSend.tracks = InternalQueue;
         InternalQueue.Empty();
     }
+    VORTEX_LOG("Flushing internal queue with %d events", BatchToSend.tracks.Num());
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/batch");
     Request->SetHeader("Content-Type", "application/json");
     Request->SetContentAsString(SerializeBatch(BatchToSend));
+    Request->OnProcessRequestComplete().BindUObject(this, &UAnalyticsManager::OnRequestComplete);
     Request->ProcessRequest();
 }
 

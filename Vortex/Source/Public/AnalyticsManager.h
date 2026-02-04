@@ -5,6 +5,8 @@
 #include "Http.h"
 #include "AnalyticsManager.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogVortex, Log, All);
+
 USTRUCT()
 struct FTrackingData
 {
@@ -95,6 +97,7 @@ private:
     void InitSession();
     void CheckServerAvailability();
     void OnCheckServerComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+    void OnRequestComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
     void ProcessTrackEvent(FString EventName, FString Value);
     void StartAutoFlushTimer();
     void StopAutoFlushTimer();

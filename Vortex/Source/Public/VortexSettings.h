@@ -19,6 +19,9 @@ public:
     UPROPERTY(Config, EditAnywhere, Category="General")
     bool bEnableInShipping = true;
 
+    UPROPERTY(Config, EditAnywhere, Category="Debug")
+    bool bVerbose = false;
+
     virtual FName GetContainerName() const override { return TEXT("Project"); }
     virtual FName GetCategoryName() const override { return TEXT("Plugins"); }
     virtual FName GetSectionName() const override { return TEXT("Vortex"); }
