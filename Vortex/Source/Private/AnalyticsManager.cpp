@@ -203,7 +203,8 @@ void UAnalyticsManager::StopAutoFlushTimer()
 
 void UAnalyticsManager::TrackEvent(FString EventName, FString Props)
 {
-    ProcessTrackEvent(EventName, Props);
+    FString WrappedValue = Props.IsEmpty() ? TEXT("") : FString::Printf(TEXT("{\"data\":\"%s\"}"), *Props.ReplaceCharWithEscapedChar());
+    ProcessTrackEvent(EventName, WrappedValue);
 }
 
 void UAnalyticsManager::TrackEventWithProps(FString EventName, TMap<FString, FString> Props)
