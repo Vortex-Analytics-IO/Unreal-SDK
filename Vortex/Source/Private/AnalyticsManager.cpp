@@ -177,7 +177,9 @@ void UAnalyticsManager::OnRequestComplete(FHttpRequestPtr Request, FHttpResponse
     if (!Response.IsValid() || !EHttpResponseCodes::IsOk(Response->GetResponseCode()))
     {
         int32 Code = Response.IsValid() ? Response->GetResponseCode() : 0;
+        FString ResponseBody = Response.IsValid() ? Response->GetContentAsString() : TEXT("No response body");
         UE_LOG(LogVortex, Warning, TEXT("Request error %d: %s"), Code, *Request->GetURL());
+        UE_LOG(LogVortex, Warning, TEXT("Response body: %s"), *ResponseBody);
     }
 }
 
