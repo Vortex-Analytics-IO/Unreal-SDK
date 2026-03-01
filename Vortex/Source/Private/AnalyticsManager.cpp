@@ -141,30 +141,51 @@ FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
 
 void UAnalyticsManager::CheckServerAvailability()
 {
-    if (Url.IsEmpty()) return;
-    VORTEX_LOG("Checking server availability at %s/health", *Url);
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetVerb("GET");
-    Request->SetURL(Url + "/health");
-    Request->OnProcessRequestComplete().BindUObject(this, &UAnalyticsManager::OnCheckServerComplete);
-    Request->ProcessRequest();
+	if (Url.IsEmpty() || TenantId.IsEmpty()) return;
+	VORTEX_LOG("Validating tenant at %s/validate?tenant_id=%s", *Url, *TenantId);
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetVerb("GET");
+	Request->SetURL(Url + "/validate?tenant_id=" + TenantId);
+	Request->OnProcessRequestComplete().BindUObject(this, &UAnalyticsManager::OnCheckServerComplete);
+	Request->ProcessRequest();
 }
 
 void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
-    bServerAlive = bWasSuccessful && Response.IsValid() && EHttpResponseCodes::IsOk(Response->GetResponseCode());
-    bIsServerChecked = true;
-    VORTEX_LOG("Server check completed - Alive: %s", bServerAlive ? TEXT("true") : TEXT("false"));
+	bIsServerChecked = true;
 
-    if (bServerAlive)
-    {
-        if (bAutoBatching) StartAutoFlushTimer();
-        else {
-            FScopeLock Lock(&QueueLock);
-            if (InternalQueue.Num() > 0 && GetWorld())
-                GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UAnalyticsManager::FlushInternalQueue);
-        }
-    }
+	if (!bWasSuccessful || !Response.IsValid())
+	{
+		bServerAlive = false;
+		UE_LOG(LogVortex, Warning, TEXT("Validation request failed - server unreachable"));
+		return;
+	}
+
+	const int32 ResponseCode = Response->GetResponseCode();
+
+	if (ResponseCode == EHttpResponseCodes::Denied)
+	{
+		bServerAlive = false;
+		UE_LOG(LogVortex, Error, TEXT("Invalid or unauthorized tenant_id: %s — analytics disabled"), *TenantId);
+		return;
+	}
+
+	bServerAlive = EHttpResponseCodes::IsOk(ResponseCode);
+	VORTEX_LOG("Validation completed - Alive: %s (HTTP %d)", bServerAlive ? TEXT("true") : TEXT("false"), ResponseCode);
+
+	if (bServerAlive)
+	{
+		if (bAutoBatching) StartAutoFlushTimer();
+		else {
+			FScopeLock Lock(&QueueLock);
+			if (InternalQueue.Num() > 0 && GetWorld())
+				GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UAnalyticsManager::FlushInternalQueue);
+		}
+	}
+	else
+	{
+		UE_LOG(LogVortex, Warning, TEXT("Validation failed with HTTP %d — analytics disabled"), ResponseCode);
+	}
 }
 
 void UAnalyticsManager::OnRequestComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
