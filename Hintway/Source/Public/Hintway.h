@@ -2,7 +2,7 @@
 
 #include "Modules/ModuleManager.h"
 
-class FVortexModule : public IModuleInterface
+class FHintwayModule : public IModuleInterface
 {
 public:
     virtual void StartupModule() override;

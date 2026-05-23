@@ -2,13 +2,13 @@
 	"FileVersion": 3,
 	"Version": 3,
 	"VersionName": "1.2",
-	"FriendlyName": "Vortex Analytics",
-	"Description": "Analytics collector for Vortex",
+	"FriendlyName": "Hintway",
+	"Description": "Analytics collector for Hintway",
 	"Category": "Analytics",
-	"CreatedBy": "Vortex",
+	"CreatedBy": "Hintway",
 	"Modules": [
 		{
-			"Name": "Vortex",
+			"Name": "Hintway",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}

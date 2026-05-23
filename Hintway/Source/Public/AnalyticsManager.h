@@ -5,7 +5,7 @@
 #include "Http.h"
 #include "AnalyticsManager.generated.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogVortex, Log, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogHintway, Log, All);
 
 USTRUCT()
 struct FTrackingData
@@ -37,35 +37,35 @@ struct FBatchedTracks
 };
 
 UCLASS(BlueprintType)
-class VORTEX_API UAnalyticsManager : public UGameInstanceSubsystem
+class HINTWAY_API UAnalyticsManager : public UGameInstanceSubsystem
 {
     GENERATED_BODY()
 
 public:
     static UAnalyticsManager* Get(const UObject* WorldContextObject);
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void Init(FString TenantId, FString Url, FString Platform);
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void TrackEvent(FString EventName, FString Props = "");
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void TrackEventWithProps(FString EventName, TMap<FString, FString> Props);
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void BatchedTrackEvent(FString EventName, FString Props = "");
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void FlushManualBatch();
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void SetAutoBatching(bool bEnabled, float Interval = 10.0f);
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void SetCustomData(TMap<FString, FString> CustomData);
 
-    UFUNCTION(BlueprintCallable, Category = "Vortex")
+    UFUNCTION(BlueprintCallable, Category = "Hintway")
     void ClearCustomData();
 
 protected:
@@ -74,7 +74,7 @@ protected:
 
 private:
     FString TenantId;
-    FString Url = TEXT("https://in.vortexanalytics.io");
+    FString Url = TEXT("https://in.hintway.app");
     FString Platform;
     bool bAutoBatching = false;
     float AutoFlushInterval = 10.0f;
@@ -104,7 +104,7 @@ private:
     void FlushInternalQueue();
     void PostSingle(const FTracking& Tracking);
     void PostBatchRoutine();
-    
+
     FTracking CreateTracking(FString Name, FString Value);
     FString SerializeTracking(const FTracking& Tracking);
     FString SerializeBatch(const FBatchedTracks& Batch);

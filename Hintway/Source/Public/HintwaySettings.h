@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
-#include "VortexSettings.generated.h"
+#include "HintwaySettings.generated.h"
 
-UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Vortex Analytics"))
-class VORTEX_API UVortexSettings : public UDeveloperSettings
+UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Hintway"))
+class HINTWAY_API UHintwaySettings : public UDeveloperSettings
 {
     GENERATED_BODY()
 
@@ -24,5 +24,5 @@ public:
 
     virtual FName GetContainerName() const override { return TEXT("Project"); }
     virtual FName GetCategoryName() const override { return TEXT("Plugins"); }
-    virtual FName GetSectionName() const override { return TEXT("Vortex"); }
+    virtual FName GetSectionName() const override { return TEXT("Hintway"); }
 };

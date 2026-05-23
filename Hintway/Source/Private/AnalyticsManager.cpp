@@ -1,12 +1,12 @@
 #include "AnalyticsManager.h"
-#include "VortexSettings.h"
+#include "HintwaySettings.h"
 #include "Kismet/GameplayStatics.h"
 
-DEFINE_LOG_CATEGORY(LogVortex);
+DEFINE_LOG_CATEGORY(LogHintway);
 
-#define VORTEX_LOG(Format, ...) \
-    if (const UVortexSettings* S = GetDefault<UVortexSettings>(); S && S->bVerbose) \
-        UE_LOG(LogVortex, Log, TEXT(Format), ##__VA_ARGS__)
+#define HINTWAY_LOG(Format, ...) \
+    if (const UHintwaySettings* S = GetDefault<UHintwaySettings>(); S && S->bVerbose) \
+        UE_LOG(LogHintway, Log, TEXT(Format), ##__VA_ARGS__)
 #include "JsonObjectConverter.h"
 #include "Misc/Guid.h"
 #include "Misc/ConfigCacheIni.h"
@@ -39,7 +39,7 @@ void UAnalyticsManager::Deinitialize()
         ManualBatchedTracks.tracks.Append(InternalQueue);
         InternalQueue.Empty();
     }
-    
+
     if (ManualBatchedTracks.tracks.Num() > 0)
         PostBatchRoutine();
 
@@ -49,7 +49,7 @@ void UAnalyticsManager::Deinitialize()
 void UAnalyticsManager::Init(FString InTenantId, FString InUrl, FString InPlatform)
 {
     if (bInitialized) return;
-    VORTEX_LOG("Init called - TenantId: %s, Url: %s, Platform: %s", *InTenantId, *InUrl, *InPlatform);
+    HINTWAY_LOG("Init called - TenantId: %s, Url: %s, Platform: %s", *InTenantId, *InUrl, *InPlatform);
     TenantId = InTenantId;
     Url = InUrl;
     Platform = InPlatform;
@@ -58,28 +58,28 @@ void UAnalyticsManager::Init(FString InTenantId, FString InUrl, FString InPlatfo
 
 void UAnalyticsManager::InternalInitialize()
 {
-    const UVortexSettings* Settings = GetDefault<UVortexSettings>();
+    const UHintwaySettings* Settings = GetDefault<UHintwaySettings>();
     if (!Settings || !Settings->bEnabled)
     {
-        VORTEX_LOG("InternalInitialize skipped - Analytics disabled");
+        HINTWAY_LOG("InternalInitialize skipped - Analytics disabled");
         return;
     }
 
     if (GIsEditor && !Settings->bEnableInEditor)
     {
-        VORTEX_LOG("InternalInitialize skipped - Editor mode disabled");
+        HINTWAY_LOG("InternalInitialize skipped - Editor mode disabled");
         return;
     }
 
     if (!Settings->bEnableInShipping)
     {
-        VORTEX_LOG("InternalInitialize skipped - Shipping disabled");
+        HINTWAY_LOG("InternalInitialize skipped - Shipping disabled");
         return;
     }
 
     if (bInitialized) return;
     bInitialized = true;
-    VORTEX_LOG("Analytics initialized successfully");
+    HINTWAY_LOG("Analytics initialized successfully");
     InitSession();
     CheckServerAvailability();
     TrackEvent(TEXT("app_started"));
@@ -89,20 +89,20 @@ void UAnalyticsManager::InitSession()
 {
     FString AnonymousID;
     bool bFound = GConfig->GetString(
-        TEXT("Vortex"), 
-        TEXT("VortexID"), 
-        AnonymousID, 
+        TEXT("Hintway"),
+        TEXT("HintwayID"),
+        AnonymousID,
         GGameIni
     );
 
     if (!bFound || AnonymousID.IsEmpty())
     {
         AnonymousID = FGuid::NewGuid().ToString();
-        
+
         GConfig->SetString(
-            TEXT("Vortex"), 
-            TEXT("VortexID"), 
-            *AnonymousID, 
+            TEXT("Hintway"),
+            TEXT("HintwayID"),
+            *AnonymousID,
             GGameIni
         );
 
@@ -114,14 +114,14 @@ void UAnalyticsManager::InitSession()
     SessionId = FGuid::NewGuid().ToString();
 
     GConfig->GetString(
-        TEXT("/Script/EngineSettings.GeneralProjectSettings"), 
-        TEXT("ProjectVersion"), 
-        AppVersion, 
+        TEXT("/Script/EngineSettings.GeneralProjectSettings"),
+        TEXT("ProjectVersion"),
+        AppVersion,
         GGameIni
     );
-    
+
     if(AppVersion.IsEmpty()) AppVersion = TEXT("1.0.0");
-    VORTEX_LOG("Session initialized - Identity: %s, SessionId: %s, AppVersion: %s", *Identity, *SessionId, *AppVersion);
+    HINTWAY_LOG("Session initialized - Identity: %s, SessionId: %s, AppVersion: %s", *Identity, *SessionId, *AppVersion);
 }
 
 FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
@@ -142,7 +142,7 @@ FTracking UAnalyticsManager::CreateTracking(FString Name, FString Value)
 void UAnalyticsManager::CheckServerAvailability()
 {
 	if (Url.IsEmpty() || TenantId.IsEmpty()) return;
-	VORTEX_LOG("Validating tenant at %s/validate?tenant_id=%s", *Url, *TenantId);
+	HINTWAY_LOG("Validating tenant at %s/validate?tenant_id=%s", *Url, *TenantId);
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetVerb("GET");
 	Request->SetURL(Url + "/validate?tenant_id=" + TenantId);
@@ -157,7 +157,7 @@ void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResp
 	if (!bWasSuccessful || !Response.IsValid())
 	{
 		bServerAlive = false;
-		UE_LOG(LogVortex, Warning, TEXT("Validation request failed - server unreachable"));
+		UE_LOG(LogHintway, Warning, TEXT("Validation request failed - server unreachable"));
 		return;
 	}
 
@@ -166,12 +166,12 @@ void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResp
 	if (ResponseCode == EHttpResponseCodes::Denied)
 	{
 		bServerAlive = false;
-		UE_LOG(LogVortex, Error, TEXT("Invalid or unauthorized tenant_id: %s — analytics disabled"), *TenantId);
+		UE_LOG(LogHintway, Error, TEXT("Invalid or unauthorized tenant_id: %s — analytics disabled"), *TenantId);
 		return;
 	}
 
 	bServerAlive = EHttpResponseCodes::IsOk(ResponseCode);
-	VORTEX_LOG("Validation completed - Alive: %s (HTTP %d)", bServerAlive ? TEXT("true") : TEXT("false"), ResponseCode);
+	HINTWAY_LOG("Validation completed - Alive: %s (HTTP %d)", bServerAlive ? TEXT("true") : TEXT("false"), ResponseCode);
 
 	if (bServerAlive)
 	{
@@ -184,7 +184,7 @@ void UAnalyticsManager::OnCheckServerComplete(FHttpRequestPtr Request, FHttpResp
 	}
 	else
 	{
-		UE_LOG(LogVortex, Warning, TEXT("Validation failed with HTTP %d — analytics disabled"), ResponseCode);
+		UE_LOG(LogHintway, Warning, TEXT("Validation failed with HTTP %d — analytics disabled"), ResponseCode);
 	}
 }
 
@@ -192,15 +192,15 @@ void UAnalyticsManager::OnRequestComplete(FHttpRequestPtr Request, FHttpResponse
 {
     if (!bWasSuccessful)
     {
-        UE_LOG(LogVortex, Warning, TEXT("Request failed: %s"), *Request->GetURL());
+        UE_LOG(LogHintway, Warning, TEXT("Request failed: %s"), *Request->GetURL());
         return;
     }
     if (!Response.IsValid() || !EHttpResponseCodes::IsOk(Response->GetResponseCode()))
     {
         int32 Code = Response.IsValid() ? Response->GetResponseCode() : 0;
         FString ResponseBody = Response.IsValid() ? Response->GetContentAsString() : TEXT("No response body");
-        UE_LOG(LogVortex, Warning, TEXT("Request error %d: %s"), Code, *Request->GetURL());
-        UE_LOG(LogVortex, Warning, TEXT("Response body: %s"), *ResponseBody);
+        UE_LOG(LogHintway, Warning, TEXT("Request error %d: %s"), Code, *Request->GetURL());
+        UE_LOG(LogHintway, Warning, TEXT("Response body: %s"), *ResponseBody);
     }
 }
 
@@ -235,10 +235,10 @@ void UAnalyticsManager::TrackEventWithProps(FString EventName, TMap<FString, FSt
 
 void UAnalyticsManager::ProcessTrackEvent(FString EventName, FString Value)
 {
-    const UVortexSettings* Settings = GetDefault<UVortexSettings>();
+    const UHintwaySettings* Settings = GetDefault<UHintwaySettings>();
     if (!Settings || !Settings->bEnabled) return;
 
-    VORTEX_LOG("Processing event: %s", *EventName);
+    HINTWAY_LOG("Processing event: %s", *EventName);
     FTracking TrackingObj = CreateTracking(EventName, Value);
     FScopeLock Lock(&QueueLock);
     if (!bIsServerChecked || bAutoBatching) InternalQueue.Add(TrackingObj);
@@ -259,7 +259,7 @@ void UAnalyticsManager::FlushManualBatch()
 
 void UAnalyticsManager::PostSingle(const FTracking& Tracking)
 {
-    VORTEX_LOG("Posting single event: %s", *Tracking.tracking.name);
+    HINTWAY_LOG("Posting single event: %s", *Tracking.tracking.name);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/track");
@@ -281,7 +281,7 @@ void UAnalyticsManager::PostBatchRoutine()
         JsonPayload = SerializeBatch(ManualBatchedTracks);
         ManualBatchedTracks.tracks.Empty();
     }
-    VORTEX_LOG("Posting manual batch with %d events", BatchCount);
+    HINTWAY_LOG("Posting manual batch with %d events", BatchCount);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/batch");
@@ -300,7 +300,7 @@ void UAnalyticsManager::FlushInternalQueue()
         BatchToSend.tracks = InternalQueue;
         InternalQueue.Empty();
     }
-    VORTEX_LOG("Flushing internal queue with %d events", BatchToSend.tracks.Num());
+    HINTWAY_LOG("Flushing internal queue with %d events", BatchToSend.tracks.Num());
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
     Request->SetVerb("POST");
     Request->SetURL(Url + "/batch");
@@ -313,7 +313,7 @@ void UAnalyticsManager::FlushInternalQueue()
 FString UAnalyticsManager::SerializeTracking(const FTracking& Tracking)
 {
     TSharedPtr<FJsonObject> JsonObj = MakeShareable(new FJsonObject);
-    
+
     // Create tracking data object
     TSharedPtr<FJsonObject> TrackingDataObj = MakeShareable(new FJsonObject);
     TrackingDataObj->SetStringField("name", Tracking.tracking.name);
@@ -323,16 +323,16 @@ FString UAnalyticsManager::SerializeTracking(const FTracking& Tracking)
     TrackingDataObj->SetStringField("platform", Tracking.tracking.platform);
     TrackingDataObj->SetStringField("app_version", Tracking.tracking.app_version);
     TrackingDataObj->SetStringField("timestamp", Tracking.tracking.timestamp);
-    
+
     // Only add custom field if not empty
     if (!Tracking.tracking.custom.IsEmpty())
     {
         TrackingDataObj->SetStringField("custom", Tracking.tracking.custom);
     }
-    
+
     JsonObj->SetStringField("tenant_id", Tracking.tenant_id);
     JsonObj->SetObjectField("tracking", TrackingDataObj);
-    
+
     FString OutputString;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
     FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
